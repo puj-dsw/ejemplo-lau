@@ -1,116 +1,179 @@
+DROP VIEW last_salary;
+DROP VIEW last_title;
+DROP VIEW more_salary;
+DROP VIEW same_dept;
+-- consulta 1
+SELECT emp.emp_no, emp.first_name, emp.last_name, emp.gender, emp.hire_date,
+       tit.title, ult_title.from_date, ult_title.to_date
+    FROM titles AS tit
+        JOIN ( 
+	      SELECT *
+                            FROM employees AS emp
+	       WHERE 
+	             emp.first_name = 'Elvis' and
+	             emp.last_name = 'Demeyer'
+              ) AS emp ON tit.emp_no = emp.emp_no
+        JOIN (
+                  SELECT emp_no, 
+                                  max(from_date) AS from_date, 
+                                  max(to_date) AS to_date
+                            FROM titles
+	      GROUP BY emp_no
+          ) AS ult_title ON ult_title.emp_no = emp.emp_no
+;
 
-use employees;
+-- Consulta 2
+SELECT ult.emp_no,
+                emp.first_name, emp.last_name, emp.gender, emp.hire_date,
+                sal.salary, ult.from_date, ult.to_date
+         FROM employees AS emp 
+	    JOIN (
+                          SELECT emp_no, 
+                                          max(from_date) AS from_date, 
+                                          max(to_date) AS to_date
+                                    FROM salaries
+		 GROUP BY emp_no
+                          ) AS ult ON ult.emp_no = emp.emp_no
+               JOIN salaries AS sal ON emp.emp_no = sal.emp_no AND ult.from_date = sal.from_date
+WHERE 
+	emp.first_name = 'Elvis' and
+	emp.last_name = 'Demeyer'
+;
 
-CREATE OR REPLACE VIEW current_title AS
-    SELECT l.emp_no , title, l.from_date, l.to_date
-    FROM titles d
-        INNER JOIN title_latest_date l
-        ON d.emp_no=l.emp_no AND d.from_date=l.from_date AND l.to_date = d.to_date;
+-- Crear vistas de las querys anteriores, 1 y 2
+-- Ultimo cargo
 
-CREATE OR REPLACE VIEW current_salary AS
-    SELECT l.emp_no, salary, l.from_date, l.to_date
-    FROM salaries s
-        INNER JOIN salary_latest_date l
-        ON s.emp_no=l.emp_no 
-        AND s.from_date=l.from_date 
-        AND l.to_date = s.to_date ;
+CREATE OR REPLACE VIEW last_title AS 
+SELECT tit.emp_no, emp.first_name, emp.last_name, emp.gender, emp.hire_date,
+                tit.title, ult_title.from_date, ult_title.to_date
+          FROM titles AS tit
+	    JOIN (
+                          SELECT emp_no, 
+                                          max(from_date) AS from_date, 
+                                          max(to_date) AS to_date
+                                    FROM titles
+		   GROUP BY emp_no
+                         ) AS ult_title ON ult_title.emp_no = tit.emp_no
+	     JOIN ( 
+	               SELECT *
+                                    FROM employees as emp
+                           ) AS emp ON tit.emp_no = emp.emp_no
+;
 
-#CONSULTA 1
+-- Ultimo salario
+CREATE OR REPLACE VIEW last_salary AS
+SELECT ult.emp_no,
+                emp.first_name, emp.last_name, emp.gender, emp.hire_date,
+                sal.salary, ult.from_date, ult.to_date
+          FROM employees as emp 
+	      JOIN (
+                           SELECT emp_no, 
+                                           max(from_date) as from_date, 
+                                           max(to_date) as to_date
+                                     FROM salaries
+		   GROUP BY emp_no
+          ) AS ult ON ult.emp_no = emp.emp_no
+                  JOIN salaries AS sal ON emp.emp_no = sal.emp_no and ult.from_date = sal.from_date
+;
 
-SELECT l.emp_no AS EmployeeNum, l.first_name AS Name, l.last_name AS LastName, title AS Title, from_date AS FromDate, to_date AS ToDate
-FROM current_title 
-INNER JOIN employees l ON current_title.emp_no=l.emp_no
-WHERE first_name="Elvis" and last_name="Demeyer";
+-- Consulta 3
+SELECT tit.emp_no, tit.first_name, tit.last_name, tit.gender,
+                tit.title, sal.salary, tit.hire_date, tit.from_date, tit.to_date
+          FROM last_salary as sal
+                 JOIN last_title AS tit ON sal.emp_no = tit.emp_no
+;
 
-#CONSULTA 2
-SELECT l.emp_no AS EmployeeNum, l.first_name AS Name, l.last_name AS LastName, salary AS Salary, from_date AS FromDate, to_date AS ToDate
-FROM current_salary
-INNER JOIN employees l ON current_salary.emp_no=l.emp_no
-WHERE  first_name="Elvis" and last_name="Demeyer";
-
-CREATE OR REPLACE VIEW salary_latest_date AS
-    SELECT emp_no, MAX(from_date) AS from_date, MAX(to_date) AS to_date
-    FROM salaries
-    GROUP BY emp_no;
-
-CREATE OR REPLACE VIEW title_latest_date AS
-    SELECT emp_no, MAX(from_date) AS from_date, MAX(to_date) AS to_date
-    FROM titles
-    GROUP BY emp_no;
-
-CREATE OR REPLACE VIEW dept_emp_latest_date AS
-    SELECT emp_no, MAX(from_date) AS from_date, MAX(to_date) AS to_date
-    FROM dept_emp
-    GROUP BY emp_no;
-
-#CONSULTA 3
-SELECT l.emp_no, d.title, s.salary, l.from_date, l.to_date, s.from_date, s.to_date
-    FROM titles d
-        INNER JOIN title_latest_date l
-        ON d.emp_no=l.emp_no AND d.from_date=l.from_date AND l.to_date = d.to_date
-INNER JOIN current_salary s
-ON s.emp_no=l.emp_no AND s.from_date=l.from_date AND l.to_date = s.to_date
-limit 10;
-
-
-#CONSULTA 4
-SELECT salary_elvis.*
-    FROM (
-        SELECT emp.first_name, emp.last_name, sal.salary
-            FROM current_salary AS sal
-            JOIN employees AS emp
-               ON sal.emp_no = emp.emp_no
-            WHERE emp.first_name="Elvis" and emp.last_name="Demeyer"
-    ) as salary_elvis;
-
+-- Consulta 4
 SELECT salary_others.*
     FROM (
-        SELECT emp.first_name, emp.last_name, sal.salary
-            FROM current_salary AS sal 
-            JOIN employees AS emp
-               ON sal.emp_no = emp.emp_no 
-            WHERE emp.first_name="Elvis" and emp.last_name="Demeyer"
-    ) as salary_elvis,
+        SELECT sal.first_name, sal.last_name, sal.salary
+            FROM last_salary AS sal 
+            WHERE sal.first_name="Elvis" AND sal.last_name="Demeyer"
+    ) AS salary_elvis,
     (
-        SELECT emp.first_name, emp.last_name, sal.salary
-            FROM current_salary AS sal 
-            JOIN employees AS emp
-               ON sal.emp_no = emp.emp_no 
-    ) as salary_others
+        SELECT sal.first_name, sal.last_name, sal.salary
+            FROM last_salary AS sal 
+    ) AS salary_others
     WHERE salary_others.salary > salary_elvis.salary
-limit 10;
+LIMIT 10
+;
 
+-- Consulta 5
+SELECT dept.dept_no, dept.dept_name,
+                emp.emp_no, emp.first_name, emp.last_name, emp.gender, emp.hire_date,
+                ult_trabajo.from_date, ult_trabajo.to_date
+          FROM departments AS dept
+                 JOIN dept_emp ON dept.dept_no = dept_emp.dept_no
+                 JOIN ( 
+                         SELECT *
+                                   FROM employees as emp
+	             WHERE 
+	                            emp.first_name = 'Elvis' and
+	                            emp.last_name = 'Demeyer'
+                            ) AS emp ON dept_emp.emp_no = emp.emp_no
+                   JOIN (
+                          SELECT emp_no, 
+                                          max(from_date) AS from_date,
+                                          max(to_date) AS to_date
+			FROM dept_emp
+                          GROUP BY emp_no
+                    ) AS ult_trabajo ON dept_emp.emp_no = ult_trabajo.emp_no
+ ;
 
-CREATE OR REPLACE VIEW current_dept_emp AS
-    SELECT l.emp_no, d.dept_no, l.from_date, l.to_date
-    FROM dept_emp d
-     INNER JOIN dept_emp_latest_date l
-        ON d.emp_no=l.emp_no AND d.from_date=l.from_date AND l.to_date = d.to_date;
-
-#CONSULTA 5
-SELECT dept_elvis.*
-    FROM (
-        SELECT emp.first_name, emp.last_name, dept.dept_no
-            FROM current_dept_emp AS dept
-            JOIN employees AS emp
-                 ON dept.emp_no = emp.emp_no
-            WHERE emp.first_name="Elvis" and emp.last_name="Demeyer"
-     as dept_elvis;
-     
-#CONSULTA 6
+-- Consulta 6
 SELECT dept_others.*
     FROM (
         SELECT emp.first_name, emp.last_name, dept.dept_no
             FROM current_dept_emp AS dept
             JOIN employees AS emp
                ON dept.emp_no = emp.emp_no
-            WHERE emp.first_name="Elvis" and emp.last_name="Demeyer"
-    ) as dept_elvis,
+            WHERE emp.first_name="Elvis" AND emp.last_name="Demeyer"
+    ) AS dept_elvis,
      (
         SELECT emp.first_name, emp.last_name, dept.dept_no
             FROM current_dept_emp AS dept
             JOIN employees AS emp
                ON dept.emp_no = emp.emp_no
-    ) as dept_others
-    WHERE dept_others.dept_no = dept_elvis.dept_no
-limit 10;
+    ) AS dept_others
+WHERE dept_others.dept_no = dept_elvis.dept_no
+LIMIT 10
+;
+
+-- Consulta 7
+-- Crear vistas de las consultas 4 y 6
+CREATE OR REPLACE VIEW more_salary AS
+SELECT salary_others.*
+    FROM (
+        SELECT sal.emp_no, sal.first_name, sal.last_name, sal.salary
+            FROM last_salary AS sal 
+		WHERE sal.first_name="Elvis" AND sal.last_name="Demeyer"
+    ) AS salary_elvis,
+    (
+        SELECT sal.emp_no, sal.first_name, sal.last_name, sal.salary
+            FROM last_salary AS sal 
+    ) AS salary_others
+WHERE salary_others.salary > salary_elvis.salary
+;
+
+CREATE OR REPLACE VIEW same_dept AS
+SELECT dept_others.*
+    FROM (
+        SELECT emp.emp_no, emp.first_name, emp.last_name, dept.dept_no
+            FROM current_dept_emp AS dept
+            JOIN employees AS emp
+               ON dept.emp_no = emp.emp_no
+            WHERE emp.first_name="Elvis" AND emp.last_name="Demeyer"
+    ) AS dept_elvis,
+     (
+        SELECT emp.emp_no, emp.first_name, emp.last_name, dept.dept_no
+            FROM current_dept_emp AS dept
+            JOIN employees AS emp
+                ON dept.emp_no = emp.emp_no
+    ) AS dept_others
+WHERE dept_others.dept_no = dept_elvis.dept_no
+;
+
+-- Consulta 7
+SELECT sd.emp_no, sd.first_name, sd.last_name, sd.dept_no, ms.salary
+    FROM same_dept_tb AS sd  JOIN more_salary_tb AS ms ON sd.emp_no = ms.emp_no
+;
